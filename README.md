@@ -1,5 +1,7 @@
 # edited qb-hud to add addiction
 you will find all the instructions in addiction.text
+# Discord
+https://discord.gg/qnpG6TmsaV
 # Things you should know:
 * To open the menu in-game the **default key** is **"I"** or you can type **"/menu"**
 * Your settings will **always** be **stored locally**, so even if you delete the resource it **will** keep your current settings. The **only** way you can wipe the local storage sucessfully is by clicking the **"Reset Settings"** button on the in-game menu
