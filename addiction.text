@@ -1,0 +1,372 @@
+# qb-ambulancob
+   server.lua :
+
+   --replace event 'hospital:server:resetHungerThirst' with that
+
+RegisterNetEvent('hospital:server:resetHungerThirst', function()
+	local Player = QBCore.Functions.GetPlayer(source)
+
+	if not Player then return end
+
+	Player.Functions.SetMetaData('hunger', 100)
+	Player.Functions.SetMetaData('thirst', 100)
+
+	TriggerClientEvent('hud:client:UpdateNeeds', source, 100, 100, Player.PlayerData.metadata.addictmeth, Player.PlayerData.metadata.addictcoke)
+end)
+
+# qb-core
+   client/loops.lua
+-- delete all the code there and replace it with the code au below
+local function addictMethEffect()
+    player = PlayerPedId()
+    DoScreenFadeOut(1000)
+    SetTimecycleModifier('spectator5')
+    SetPedMotionBlur(player, true)
+    SetPedMovementClipset(player, 'MOVE_M@DRUNK@SLIGHTLYDRUNK', true)
+    SetPedIsDrunk(player, true)
+    SetPedAccuracy(player, 0)
+    Wait(1000)
+    DoScreenFadeIn(1000)
+    ClearTimecycleModifier()
+    ResetScenarioTypesEnabled()
+    ResetPedMovementClipset(player, 0)
+    SetPedIsDrunk(player, false)
+    SetPedMotionBlur(player, false)
+end
+
+CreateThread(function()
+    while true do
+        local sleep = 0
+        if LocalPlayer.state.isLoggedIn then
+            sleep = (1000 * 60) * QBCore.Config.UpdateInterval
+            TriggerServerEvent('QBCore:UpdatePlayer')
+        end
+        Wait(sleep)
+    end
+end)
+
+CreateThread(function()
+    while true do
+        if LocalPlayer.state.isLoggedIn then
+            if (QBCore.PlayerData.metadata['hunger'] <= 0 or QBCore.PlayerData.metadata['thirst'] <= 0) and not QBCore.PlayerData.metadata['isdead'] then
+                local ped = PlayerPedId()
+                local currentHealth = GetEntityHealth(ped)
+                local decreaseThreshold = math.random(5, 10)
+                SetEntityHealth(ped, currentHealth - decreaseThreshold)
+            end
+            if QBCore.PlayerData.metadata['addictmeth'] <= 30 then
+                ------- chwaya wabna
+                addictMethEffect()
+                if QBCore.PlayerData.metadata['addictmeth'] <= 0 then
+                    TriggerEvent('animations:client:EmoteCommandStart', {"fallover5"})
+                    QBCore.Functions.Notify("Lezmek meth makech tmout", "error")
+                    TriggerEvent('animations:client:Walk', {"drunk3"})
+                    
+                    local ped = PlayerPedId()
+                    
+                    DoScreenFadeOut(1000)
+                    SetPedToRagdollWithFall(ped, 2500, 4000, 1, GetEntityForwardVector(ped), 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+                    DoScreenFadeIn(1000)
+                    
+                    local currentHealth = GetEntityHealth(ped)
+                    SetEntityHealth(ped, currentHealth - 2)
+                end
+            end
+            if QBCore.PlayerData.metadata['addictcoke'] <= 30 then
+                ------- chwaya wabna
+                addictMethEffect()
+                if QBCore.PlayerData.metadata['addictcoke'] <= 0 then
+                    QBCore.Functions.Notify("Lezmek coke", "error")
+                    TriggerEvent('animations:client:Walk', {"drunk"})
+                    local ped = PlayerPedId()
+
+                    DoScreenFadeOut(1000)
+                    SetPedToRagdollWithFall(ped, 2500, 4000, 1, GetEntityForwardVector(ped), 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+                    DoScreenFadeIn(1000)
+                    
+                    local currentHealth = GetEntityHealth(ped)
+                    SetEntityHealth(ped, currentHealth - 3)
+                end
+            end
+        end
+        Wait(QBCore.Config.StatusInterval)
+    end
+end)
+
+   shared.lua
+   -- add those two items
+   ['curecoke'] 					 = {['name'] = 'curecoke', 			  	  		['label'] = 'Cure Coke', 				['weight'] = 0, 		['type'] = 'item', 		['image'] = 'curecoke.png', 			['unique'] = false, 	['useable'] = true, 	['shouldClose'] = true,    ['combinable'] = nil,   ['description'] = 'To get happy real quick', ["created"] = nil, ["decay"] = 3.0, ["delete"] = false},
+	['curemeth'] 					 = {['name'] = 'curemeth', 			  	  		['label'] = 'Cure Meth', 				['weight'] = 0, 		['type'] = 'item', 		['image'] = 'curemeth.png', 			['unique'] = false, 	['useable'] = true, 	['shouldClose'] = true,    ['combinable'] = nil,   ['description'] = 'To get happy real quick', ["created"] = nil, ["decay"] = 3.0, ["delete"] = false},
+	
+   Config.lua :
+
+   -- add those two lines under  QBConfig.Player.ThirstRate
+QBConfig.Player.AddictMethRate = 8.0 
+QBConfig.Player.AddictCokeRate = 6.0 
+
+   server/events.lua:
+
+   -- search for the event "Update Player" and replace it with the code below
+   RegisterNetEvent('QBCore:UpdatePlayer', function()
+      local src = source
+      local Player = QBCore.Functions.GetPlayer(src)
+      if not Player then return end
+      local newHunger = Player.PlayerData.metadata['hunger'] - QBCore.Config.Player.HungerRate
+      local newThirst = Player.PlayerData.metadata['thirst'] - QBCore.Config.Player.ThirstRate
+      local newAddictmeth = Player.PlayerData.metadata['addictmeth'] - QBCore.Config.Player.AddictMethRate
+      local newAddictcoke = Player.PlayerData.metadata['addictcoke'] - QBCore.Config.Player.AddictCokeRate
+      if newHunger <= 0 then
+          newHunger = 0
+      end
+      if newThirst <= 0 then
+          newThirst = 0
+      end
+      if newAddictmeth <= 0 then
+          newAddictmeth = 0
+      end
+      if newAddictcoke <= 0 then
+          newAddictcoke = 0
+      end
+      Player.Functions.SetMetaData('thirst', newThirst)
+      Player.Functions.SetMetaData('hunger', newHunger)
+      local citizenid = Player.PlayerData.citizenid
+      local isaddictedMeth = MySQL.Sync.fetchAll('SELECT * FROM players WHERE citizenid = ? AND addictedmeth = ?', { citizenid, 1})
+      local isaddictedCoke = MySQL.Sync.fetchAll('SELECT * FROM players WHERE citizenid = ? AND addictedcoke = ?', { citizenid, 1})
+      if isaddictedMeth[1] ~= nil then
+          if isaddictedCoke[1] ~= nil then
+              Player.Functions.SetMetaData('addictmeth', newAddictmeth)
+              Player.Functions.SetMetaData('addictcoke', newAddictcoke)
+              TriggerClientEvent('hud:client:UpdateNeeds', src, newHunger, newThirst, newAddictmeth, newAddictcoke)
+          else   
+              Player.Functions.SetMetaData('addictmeth', newAddictmeth)
+              TriggerClientEvent('hud:client:UpdateNeeds', src, newHunger, newThirst, newAddictmeth, 100) 
+          end  
+      else 
+          if isaddictedCoke[1] ~= nil then
+              Player.Functions.SetMetaData('addictcoke', newAddictcoke)
+              TriggerClientEvent('hud:client:UpdateNeeds', src, newHunger, newThirst, 100, newAddictcoke)  
+          else
+              TriggerClientEvent('hud:client:UpdateNeeds', src, newHunger, newThirst, 100, 100) 
+          end     
+      end    
+      Player.Functions.Save()
+  end)
+
+
+  server/player.lua
+
+  -- add thosetwo lines under     PlayerData.metadata['thirst'] = PlayerData.metadata['thirst'] or 100
+
+  PlayerData.metadata["addictmeth"] = PlayerData.metadata["addictmeth"] ~= nil and PlayerData.metadata["addictmeth"] or 100
+  PlayerData.metadata["addictcoke"] = PlayerData.metadata["addictcoke"] ~= nil and PlayerData.metadata["addictcoke"] or 100
+
+  -- search for this function self.Functions.SetMetaData(meta, val)
+  -- change it with the function au below
+  function self.Functions.SetMetaData(meta, val)
+   if not meta or type(meta) ~= 'string' then return end
+   if meta == 'hunger' or meta == 'thirst' or meta == 'addictmeth' or meta == 'addictcoke' then
+       val = val > 100 and 100 or val
+   end
+   self.PlayerData.metadata[meta] = val
+   self.Functions.UpdatePlayerData()
+end
+
+# qb-smallresources
+   client/consumables.lua
+
+   -- change this event 'consumables:client:Cokebaggy'  with this
+   RegisterNetEvent('consumables:client:Cokebaggy', function()
+      local ped = PlayerPedId()
+      QBCore.Functions.Progressbar("snort_coke", Lang:t('consumables.coke_progress'), math.random(5000, 8000), false, true, {
+          disableMovement = false,
+          disableCarMovement = false,
+          disableMouse = false,
+          disableCombat = true,
+      }, {
+          animDict = "switch@trevor@trev_smoking_meth",
+          anim = "trev_smoking_meth_loop",
+          flags = 49,
+      }, {}, {}, function() -- Done
+          StopAnimTask(ped, "switch@trevor@trev_smoking_meth", "trev_smoking_meth_loop", 1.0)
+          TriggerServerEvent("consumables:server:useCokeBaggy")
+          TriggerEvent("inventory:client:ItemBox", QBCore.Shared.Items["cokebaggy"], "remove")
+          TriggerEvent("evidence:client:SetStatus", "widepupils", 200)
+          AddArmourToPed(ped,25)
+          SetEntityHealth(PlayerPedId(), GetEntityHealth(PlayerPedId()) + 20)
+          TriggerServerEvent("consumables:server:addcokedict", QBCore.Functions.GetPlayerData().metadata["addictcoke"] + 50)
+          CokeBaggyEffect()
+      end, function() -- Cancel
+          StopAnimTask(ped, "switch@trevor@trev_smoking_meth", "trev_smoking_meth_loop", 1.0)
+          QBCore.Functions.Notify(Lang:t('consumables.canceled'), "error")
+      end)
+  end)
+
+     -- change this event 'consumables:client:meth'  with this
+     RegisterNetEvent('consumables:client:meth', function()
+      QBCore.Functions.Progressbar("snort_meth", Lang:t('consumables.meth_progress'), 1500, false, true, {
+          disableMovement = false,
+          disableCarMovement = false,
+          disableMouse = false,
+          disableCombat = true,
+      }, {
+          animDict = "switch@trevor@trev_smoking_meth",
+          anim = "trev_smoking_meth_loop",
+          flags = 49,
+      }, {}, {}, function() -- Done
+          StopAnimTask(PlayerPedId(), "switch@trevor@trev_smoking_meth", "trev_smoking_meth_loop", 1.0)
+          TriggerServerEvent("consumables:server:useMeth")
+          TriggerEvent("inventory:client:ItemBox", QBCore.Shared.Items["meth"], "remove")
+          TriggerEvent("evidence:client:SetStatus", "widepupils", 300)
+          TriggerEvent("evidence:client:SetStatus", "agitated", 300)
+          AddArmourToPed(PlayerPedId(), 50)
+          TriggerServerEvent("consumables:server:addmethdict", QBCore.Functions.GetPlayerData().metadata["addictmeth"] + 50)
+          MethBagEffect()
+      end, function() -- Cancel
+          StopAnimTask(PlayerPedId(), "switch@trevor@trev_smoking_meth", "trev_smoking_meth_loop", 1.0)
+          QBCore.Functions.Notify(Lang:t('consumables.canceled'), "error")
+      end)
+  end)
+
+
+  server/consumables.lua 
+  -- add this code
+  QBCore.Functions.CreateUseableItem("curemeth", function(source, item)
+   local src = source
+   local Player = QBCore.Functions.GetPlayer(src)
+   if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+       TriggerClientEvent("consumables:client:curemeth", source)
+   end
+end)
+
+QBCore.Functions.CreateUseableItem("curecoke", function(source, item)
+   local src = source
+   local Player = QBCore.Functions.GetPlayer(src)
+   if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+       TriggerClientEvent("consumables:client:curecoke", source)
+   end
+end)
+
+RegisterNetEvent('consumables:server:usecuremeth', function()
+   local src = source
+   local Player = QBCore.Functions.GetPlayer(src)
+
+   if not Player then return end
+
+   local citizenid = Player.PlayerData.citizenid
+       local isaddicted = MySQL.Sync.fetchAll('SELECT * FROM players WHERE citizenid = ? AND addictedmeth = ?', {citizenid, 1})
+       if isaddicted[1] ~= nil then    
+           MySQL.Async.execute('UPDATE players SET addictedmeth = ? WHERE citizenid = ?', {0, citizenid}) 
+           TriggerClientEvent('QBCore:Notify', src, 'Tna7alek idmen meth', "success", 4000)
+           TriggerClientEvent('hospital:client:Revive', Player.PlayerData.source) 
+           Player.Functions.SetMetaData('addictmeth', 100)
+           TriggerClientEvent('hud:client:UpdateNeeds', src, Player.PlayerData.metadata.hunger, Player.PlayerData.metadata.thirst, 100, Player.PlayerData.metadata.addictcoke)
+       else            
+           TriggerClientEvent('QBCore:Notify', src, 'Deja Makech addicted', "error", 4000) 
+       end
+end)
+
+RegisterNetEvent('consumables:server:usecurecoke', function()
+   local src = source
+   local Player = QBCore.Functions.GetPlayer(src)
+
+   if not Player then return end
+   local citizenid = Player.PlayerData.citizenid
+   local isaddicted = MySQL.Sync.fetchAll('SELECT * FROM players WHERE citizenid = ? AND addictedcoke = ?', {citizenid, 1})
+   if isaddicted[1] ~= nil then    
+       MySQL.Async.execute('UPDATE players SET addictedcoke = ? WHERE citizenid = ?', {0, citizenid}) 
+       TriggerClientEvent('QBCore:Notify', src, 'Tna7alek idmen coke', "success", 4000)
+       TriggerClientEvent('hospital:client:Revive', Player.PlayerData.source) 
+       Player.Functions.SetMetaData('addictcoke', 100)
+       TriggerClientEvent('hud:client:UpdateNeeds', src, Player.PlayerData.metadata.hunger, Player.PlayerData.metadata.thirst, Player.PlayerData.metadata.addictmeth, 100)
+   else            
+       TriggerClientEvent('QBCore:Notify', src, 'Deja Makech addicted', "error", 4000) 
+   end  
+end)
+
+
+RegisterNetEvent('consumables:server:addcokedict', function(amount)
+   local Player = QBCore.Functions.GetPlayer(source)
+
+   if not Player then return end
+
+   Player.Functions.SetMetaData('addictcoke', amount)
+   TriggerClientEvent('hud:client:UpdateNeeds', source, Player.PlayerData.metadata.hunger, Player.PlayerData.metadata.thirst, Player.PlayerData.metadata.addictmeth, amount)
+end)
+
+RegisterNetEvent('consumables:server:addmethdict', function(amount)
+   local Player = QBCore.Functions.GetPlayer(source)
+
+   if not Player then return end
+
+   Player.Functions.SetMetaData('addictmeth', amount)
+   TriggerClientEvent('hud:client:UpdateNeeds', source, Player.PlayerData.metadata.hunger, Player.PlayerData.metadata.thirst, amount, Player.PlayerData.metadata.addictcoke)
+end)
+
+
+-- change useable items cokebaggy and meth with that
+
+QBCore.Functions.CreateUseableItem("cokebaggy", function(source, item)
+   local src = source
+   local Player = QBCore.Functions.GetPlayer(src)
+  if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+       local citizenid = Player.PlayerData.citizenid
+       local isaddicted = MySQL.Sync.fetchAll('SELECT * FROM players WHERE citizenid = ? AND addictedcoke = ?', {citizenid, 1})
+       if isaddicted[1] == nil then    
+           MySQL.Async.execute('UPDATE players SET addictedcoke = ? WHERE citizenid = ?', {1, citizenid}) 
+           TriggerClientEvent('QBCore:Notify', src, 'Walit Modemen 3al coke', "error", 4000) 
+           TriggerClientEvent('QBCore:Notify', src, 'Rabbi yfarej 3lik', "success", 4000) 
+       end 
+       TriggerClientEvent("consumables:client:Cokebaggy", src)      
+   end
+end)
+
+QBCore.Functions.CreateUseableItem("meth", function(source, item)
+   local src = source
+   local Player = QBCore.Functions.GetPlayer(src)
+  if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+       local citizenid = Player.PlayerData.citizenid
+       local isaddicted = MySQL.Sync.fetchAll('SELECT * FROM players WHERE citizenid = ? AND addictedmeth = ?', {citizenid, 1})
+       if isaddicted[1] == nil then    
+           MySQL.Async.execute('UPDATE players SET addictedmeth = ? WHERE citizenid = ?', {1, citizenid}) 
+           TriggerClientEvent('QBCore:Notify', src, 'Walit Modemen 3al meth', "error", 4000) 
+           TriggerClientEvent('QBCore:Notify', src, 'Rabbi yfarej 3lik', "success", 4000) 
+       end       
+       TriggerClientEvent("consumables:client:meth", source)
+   end
+end)
+
+
+
+
+
+---------------------------------------------
+now you need to add to every TriggerClientEvent 'hud:client:UpdateNeeds' her new parametre
+
+exemple
+
+server/consumables.lua 
+-- old
+
+RegisterNetEvent('consumables:server:addThirst', function(amount)
+   local Player = QBCore.Functions.GetPlayer(source)
+
+   if not Player then return end
+
+   Player.Functions.SetMetaData('thirst', amount)
+   TriggerClientEvent('hud:client:UpdateNeeds', source, Player.PlayerData.metadata.hunger, amount)
+end)
+
+--new
+
+RegisterNetEvent('consumables:server:addThirst', function(amount)
+   local Player = QBCore.Functions.GetPlayer(source)
+
+   if not Player then return end
+
+   Player.Functions.SetMetaData('thirst', amount)
+   TriggerClientEvent('hud:client:UpdateNeeds', source, Player.PlayerData.metadata.hunger, amount, Player.PlayerData.metadata.addictmeth, Player.PlayerData.metadata.addictcoke)
+end)
+
+---------------- 
+last instruction 
+you need to replace qb-hud with this edited qb-hud
