@@ -237,6 +237,45 @@ server_scripts {
       end)
   end)
 
+RegisterNetEvent('consumables:client:curecoke', function()
+    QBCore.Functions.Progressbar("use_curecoke", "use pills", 2000, false, true, {
+        disableMovement = false,
+        disableCarMovement = false,
+        disableMouse = false,
+        disableCombat = true,
+    }, {
+        animDict = "mp_suicide",
+        anim = "pill",
+        flags = 49,
+    }, {}, {}, function() -- Done
+        StopAnimTask(PlayerPedId(), "mp_suicide", "pill", 1.0)
+        TriggerServerEvent("consumables:server:usecurecoke")
+        TriggerEvent("inventory:client:ItemBox", QBCore.Shared.Items["curecoke"], "remove")
+    end, function() -- Cancel
+        StopAnimTask(PlayerPedId(), "mp_suicide", "pill", 1.0)
+        QBCore.Functions.Notify(Lang:t('consumables.canceled'), "error")
+    end)
+end)
+
+RegisterNetEvent('consumables:client:curemeth', function()
+    QBCore.Functions.Progressbar("use_curecoke", "use pills", 2000, false, true, {
+        disableMovement = false,
+        disableCarMovement = false,
+        disableMouse = false,
+        disableCombat = true,
+    }, {
+        animDict = "mp_suicide",
+        anim = "pill",
+        flags = 49,
+    }, {}, {}, function() -- Done
+        StopAnimTask(PlayerPedId(), "mp_suicide", "pill", 1.0)
+        TriggerServerEvent("consumables:server:usecuremeth")
+        TriggerEvent("inventory:client:ItemBox", QBCore.Shared.Items["curemeth"], "remove")
+    end, function() -- Cancel
+        StopAnimTask(PlayerPedId(), "mp_suicide", "pill", 1.0)
+        QBCore.Functions.Notify(Lang:t('consumables.canceled'), "error")
+    end)
+end)
 
   server/consumables.lua 
   -- add this code
